@@ -1,4 +1,4 @@
-project('gobject-introspection', 'c')
+project('gobject-introspection', 'c', 'vala')
 
 gnome = import('gnome')
 gio = dependency('gio-2.0')
@@ -15,3 +15,4 @@ subdir('schemas')
 subdir('gdbus')
 subdir('mkenums')
 subdir('genmarshal')
+subdir('vapi')

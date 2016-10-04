@@ -158,7 +158,7 @@ class GnomeModule:
                 ldflags.update(extdepflags[1])
                 gi_includes.update(extdepflags[2])
                 for source in dep.sources:
-                    if isinstance(source.held_object, GirTarget):
+                    if hasattr(source, 'held_option') and isinstance(source.held_object, GirTarget):
                         gi_includes.update([os.path.join(state.environment.get_build_dir(),
                                         source.held_object.get_subdir())])
             # This should be any dependency other than an internal one.
@@ -642,6 +642,68 @@ class GnomeModule:
 
         return [body, header]
 
+
+    def generate_vapi(self, state, args, kwargs):
+        if len(args) != 1: # FIXME: Arg parsing counts lists incorrectly?
+            raise MesonException('The library name is required')
+
+        if not isinstance(args[0], str):
+            raise MesonException('The first argument must be the name of the library')
+
+        def args_to_command(prefix, variable, kwargs):
+            arg_list = kwargs.get(variable)
+            if not arg_list:
+                return []
+            ret = []
+            if isinstance(arg_list, str):
+                arg_list = [arg_list]
+            for arg in arg_list:
+                if not isinstance(arg, str):
+                    raise MesonException('All {} must be strings'.format(variable))
+                ret.append(prefix + arg)
+            return ret
+
+        library = args[0]
+        build_dir = os.path.join(state.environment.get_build_dir(), state.subdir)
+        source_dir = os.path.join(state.environment.get_source_dir(), state.subdir)
+        cmd = ['vapigen', '--quiet', '--library=' + library, '--directory=' + build_dir]
+        cmd += args_to_command('--vapidir=', 'vapi_dirs', kwargs)
+        cmd += args_to_command('--metadatadir=', 'metadata_dirs', kwargs)
+        cmd += args_to_command('--girdir=', 'gir_dirs', kwargs)
+        cmd += args_to_command('--pkg=', 'packages', kwargs)
+        cmd += ['--metadatadir=' + source_dir]
+
+        inputs = kwargs.get('sources')
+        if not inputs:
+            raise MesonException('sources are required to generate the vapi file')
+
+        if not isinstance(inputs, list):
+            inputs = [inputs]
+
+        for i in inputs:
+            if isinstance(i, str):
+                cmd.append(os.path.join(source_dir, i))
+            elif hasattr(i, 'held_object') \
+                 and isinstance(i.held_object, GirTarget):
+                gir_file = os.path.join(state.environment.get_build_dir(),
+                                    i.held_object.get_subdir(),
+                                    i.held_object.output[0])
+                cmd.append(gir_file)
+            else:
+                raise MesonException('Input must be a str or GirTarget')
+
+        vapi_output = library + '.vapi'
+        custom_kwargs = {
+            'command': cmd,
+            'input': inputs,
+            'output': vapi_output,
+        }
+        if kwargs.get('install'):
+            custom_kwargs['install'] = kwargs['install']
+            custom_kwargs['install_dir'] = kwargs.get('install_dir',
+                os.path.join(state.environment.coredata.get_builtin_option('datadir'),
+                             'vala', 'vapi'))
+        return build.CustomTarget(vapi_output, state.subdir, custom_kwargs)
 
 def initialize():
     return GnomeModule()

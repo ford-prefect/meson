@@ -14,7 +14,7 @@ girexe = executable(
   link_with : girlib
 )
 
-gnome.generate_gir(
+girgir = gnome.generate_gir(
   girlib,
   sources : libsources,
   nsversion : '1.0',
