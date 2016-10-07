@@ -36,15 +36,23 @@ class UserStringOption(UserOption):
     def validate(self, value):
         if not isinstance(value, str):
             raise MesonException('Value "%s" for string option "%s" is not a string.' % (str(value), self.name))
-        if self.name == 'prefix' and not os.path.isabs(value):
-            raise MesonException('Prefix option value \'{0}\' must be an absolute path.'.format(value))
-        if self.name in ('libdir', 'bindir', 'includedir', 'datadir', 'mandir', 'localedir') \
-            and os.path.isabs(value):
-            raise MesonException('Option %s must not be an absolute path.' % self.name)
 
     def set_value(self, newvalue):
         self.validate(newvalue)
         self.value = newvalue
+
+class UserPathOption(UserStringOption):
+    def __init__(self, name, description, value, choices=None):
+        super().__init__(self, name, description, choices)
+        self.set_value(value)
+
+    def validate(self, value):
+        super().validate(value)
+
+    def set_value(self, newvalue):
+        self.validate(newvalue)
+        # Do normalizing just for better look & feel
+        self.value = os.path.normpath(newvalue)
 
 class UserBooleanOption(UserOption):
     def __init__(self, name, description, value):
@@ -177,7 +185,7 @@ def is_builtin_option(optname):
 
 def get_builtin_option_choices(optname):
     if is_builtin_option(optname):
-        if builtin_options[optname][0] == UserStringOption:
+        if builtin_options[optname][0] in (UserStringOption, UserPathOption):
             return None
         elif builtin_options[optname][0] == UserBooleanOption:
             return [ True, False ]
@@ -205,19 +213,19 @@ builtin_options = {
         'buildtype'         : [ UserComboOption, 'Build type to use.', [ 'plain', 'debug', 'debugoptimized', 'release', 'minsize' ], 'debug' ],
         'strip'             : [ UserBooleanOption, 'Strip targets on install.', False ],
         'unity'             : [ UserBooleanOption, 'Unity build.', False ],
-        'prefix'            : [ UserStringOption, 'Installation prefix.', default_prefix() ],
-        'libdir'            : [ UserStringOption, 'Library directory.', default_libdir() ],
-        'libexecdir'        : [ UserStringOption, 'Library executable directory.', default_libexecdir() ],
-        'bindir'            : [ UserStringOption, 'Executable directory.', 'bin' ],
-        'includedir'        : [ UserStringOption, 'Header file directory.', 'include' ],
-        'datadir'           : [ UserStringOption, 'Data file directory.', 'share' ],
-        'mandir'            : [ UserStringOption, 'Manual page directory.', 'share/man' ],
-        'localedir'         : [ UserStringOption, 'Locale data directory.', 'share/locale' ],
+        'prefix'            : [ UserPathOption, 'Installation prefix.', default_prefix() ],
+        'libdir'            : [ UserPathOption, 'Library directory.', default_libdir() ],
+        'libexecdir'        : [ UserPathOption, 'Library executable directory.', default_libexecdir() ],
+        'bindir'            : [ UserPathOption, 'Executable directory.', 'bin' ],
+        'includedir'        : [ UserPathOption, 'Header file directory.', 'include' ],
+        'datadir'           : [ UserPathOption, 'Data file directory.', 'share' ],
+        'mandir'            : [ UserPathOption, 'Manual page directory.', 'share/man' ],
+        'localedir'         : [ UserPathOption, 'Locale data directory.', 'share/locale' ],
     # Sysconfdir is a bit special. It defaults to ${prefix}/etc but nobody
     # uses that. Instead they always set it manually to /etc. This default
     # value is thus pointless and not really used but we set it to this
     # for consistency with other systems.
-        'sysconfdir'        : [ UserStringOption, 'Sysconf data directory.', 'etc' ],
+        'sysconfdir'        : [ UserPathOption, 'Sysconf data directory.', 'etc' ],
         'werror'            : [ UserBooleanOption, 'Treat warnings as errors.', False ],
         'warning_level'     : [ UserComboOption, 'Compiler warning level to use.', [ '1', '2', '3' ], '1'],
         'layout'            : [ UserComboOption, 'Build directory layout.', ['mirror', 'flat' ], 'mirror' ],
